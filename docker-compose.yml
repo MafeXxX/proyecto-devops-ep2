@@ -1,11 +1,7 @@
-version: '3.9'
-
 services:
-
   mysql:
-    image: mysql:8
+    image: mysql:8.0
     container_name: mysql_db
-
     restart: unless-stopped
 
     environment:
@@ -24,29 +20,25 @@ services:
       - proyecto-network
 
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot123 || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-
+      retries: 20
+      start_period: 40s
 
   backend-ventas:
     build:
       context: ./back-Ventas_SpringBoot/Springboot-API-REST
-
     container_name: backend_ventas
-
     restart: unless-stopped
 
     ports:
       - "8080:8080"
 
     environment:
-      DB_ENDPOINT: mysql
-      DB_PORT: 3306
-      DB_NAME: proyecto_db
-      DB_USERNAME: admin
-      DB_PASSWORD: admin123
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/proyecto_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin123
 
     depends_on:
       mysql:
@@ -55,24 +47,19 @@ services:
     networks:
       - proyecto-network
 
-
   backend-despachos:
     build:
       context: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
-
     container_name: backend_despachos
-
     restart: unless-stopped
 
     ports:
       - "8081:8081"
 
     environment:
-      DB_ENDPOINT: mysql
-      DB_PORT: 3306
-      DB_NAME: proyecto_db
-      DB_USERNAME: admin
-      DB_PASSWORD: admin123
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/proyecto_db?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin123
 
     depends_on:
       mysql:
@@ -81,13 +68,10 @@ services:
     networks:
       - proyecto-network
 
-
   frontend:
     build:
       context: ./front_despacho
-
     container_name: frontend_app
-
     restart: unless-stopped
 
     ports:
@@ -100,10 +84,8 @@ services:
     networks:
       - proyecto-network
 
-
 volumes:
   mysql_data:
-
 
 networks:
   proyecto-network:
