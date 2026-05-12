@@ -1,19 +1,10 @@
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
 provider "aws" {
   region = var.aws_region
 }
 
-# VPC
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
   enable_dns_hostnames = true
 
   tags = {
@@ -21,7 +12,14 @@ resource "aws_vpc" "main" {
   }
 }
 
-# Subred pública para Frontend
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "${var.project_name}-igw"
+  }
+}
+
 resource "aws_subnet" "public_frontend" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
@@ -33,7 +31,6 @@ resource "aws_subnet" "public_frontend" {
   }
 }
 
-# Subred privada para Backend y BD
 resource "aws_subnet" "private_backend" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.2.0/24"
@@ -44,16 +41,25 @@ resource "aws_subnet" "private_backend" {
   }
 }
 
-# Internet Gateway
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
+resource "aws_eip" "nat_eip" {
+  domain = "vpc"
 
   tags = {
-    Name = "${var.project_name}-igw"
+    Name = "${var.project_name}-nat-eip"
   }
 }
 
-# Tabla pública
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = aws_subnet.public_frontend.id
+
+  tags = {
+    Name = "${var.project_name}-nat-gateway"
+  }
+
+  depends_on = [aws_internet_gateway.main]
+}
+
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -72,7 +78,24 @@ resource "aws_route_table_association" "public_frontend" {
   route_table_id = aws_route_table.public.id
 }
 
-# Security Group Frontend
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.main.id
+  }
+
+  tags = {
+    Name = "${var.project_name}-private-rt"
+  }
+}
+
+resource "aws_route_table_association" "private_backend" {
+  subnet_id      = aws_subnet.private_backend.id
+  route_table_id = aws_route_table.private.id
+}
+
 resource "aws_security_group" "frontend_sg" {
   name        = "${var.project_name}-frontend-sg"
   description = "Acceso publico al frontend"
@@ -106,7 +129,6 @@ resource "aws_security_group" "frontend_sg" {
   }
 }
 
-# Security Group Backend
 resource "aws_security_group" "backend_sg" {
   name        = "${var.project_name}-backend-sg"
   description = "Backend privado"
@@ -129,11 +151,11 @@ resource "aws_security_group" "backend_sg" {
   }
 
   ingress {
-    description = "SSH administracion"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.my_ip_cidr]
+    description     = "SSH desde frontend"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.frontend_sg.id]
   }
 
   egress {
@@ -148,10 +170,9 @@ resource "aws_security_group" "backend_sg" {
   }
 }
 
-# Security Group MySQL
 resource "aws_security_group" "mysql_sg" {
   name        = "${var.project_name}-mysql-sg"
-  description = "MySQL solo desde backend"
+  description = "MySQL privado"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -163,9 +184,9 @@ resource "aws_security_group" "mysql_sg" {
   }
 
   ingress {
-    description     = "MySQL desde frontend si docker-compose corre todo junto"
-    from_port       = 3306
-    to_port         = 3306
+    description     = "SSH desde frontend"
+    from_port       = 22
+    to_port         = 22
     protocol        = "tcp"
     security_groups = [aws_security_group.frontend_sg.id]
   }
@@ -182,7 +203,6 @@ resource "aws_security_group" "mysql_sg" {
   }
 }
 
-# AMI Amazon Linux 2023
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
@@ -193,7 +213,6 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-# EC2 Frontend pública
 resource "aws_instance" "frontend" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
@@ -206,22 +225,20 @@ resource "aws_instance" "frontend" {
     volume_type = "gp3"
   }
 
-  user_data = <<-EOF
-    #!/bin/bash
-    yum update -y
-    yum install -y docker git
-    systemctl start docker
-    systemctl enable docker
-    usermod -aG docker ec2-user
-    docker --version
-  EOF
+  user_data = <<EOF
+#!/bin/bash
+dnf update -y
+dnf install docker -y
+systemctl start docker
+systemctl enable docker
+usermod -aG docker ec2-user
+EOF
 
   tags = {
     Name = "${var.project_name}-frontend-ec2"
   }
 }
 
-# EC2 Backend privada
 resource "aws_instance" "backend" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
@@ -230,26 +247,24 @@ resource "aws_instance" "backend" {
   key_name               = var.key_pair_name
 
   root_block_device {
-    volume_size = 20
+    volume_size = 30
     volume_type = "gp3"
   }
 
-  user_data = <<-EOF
-    #!/bin/bash
-    yum update -y
-    yum install -y docker git
-    systemctl start docker
-    systemctl enable docker
-    usermod -aG docker ec2-user
-    docker --version
-  EOF
+  user_data = <<EOF
+#!/bin/bash
+dnf update -y
+dnf install docker -y
+systemctl start docker
+systemctl enable docker
+usermod -aG docker ec2-user
+EOF
 
   tags = {
     Name = "${var.project_name}-backend-ec2"
   }
 }
 
-# EC2 MySQL privada
 resource "aws_instance" "mysql" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
@@ -262,26 +277,27 @@ resource "aws_instance" "mysql" {
     volume_type = "gp3"
   }
 
-  user_data = <<-EOF
-    #!/bin/bash
-    yum update -y
-    yum install -y docker
-    systemctl start docker
-    systemctl enable docker
+  user_data = <<EOF
+#!/bin/bash
+dnf update -y
+dnf install docker -y
+systemctl start docker
+systemctl enable docker
+usermod -aG docker ec2-user
 
-    docker volume create mysql_data
+docker volume create mysql_data
 
-    docker run -d \
-      --name mysql \
-      -e MYSQL_ROOT_PASSWORD=${var.db_root_password} \
-      -e MYSQL_DATABASE=${var.db_name} \
-      -e MYSQL_USER=${var.db_user} \
-      -e MYSQL_PASSWORD=${var.db_password} \
-      -p 3306:3306 \
-      -v mysql_data:/var/lib/mysql \
-      --restart unless-stopped \
-      mysql:8
-  EOF
+docker run -d \
+  --name mysql_db \
+  -e MYSQL_ROOT_PASSWORD=${var.db_root_password} \
+  -e MYSQL_DATABASE=${var.db_name} \
+  -e MYSQL_USER=${var.db_user} \
+  -e MYSQL_PASSWORD=${var.db_password} \
+  -p 3306:3306 \
+  -v mysql_data:/var/lib/mysql \
+  --restart unless-stopped \
+  mysql:8.0
+EOF
 
   tags = {
     Name = "${var.project_name}-mysql-ec2"
