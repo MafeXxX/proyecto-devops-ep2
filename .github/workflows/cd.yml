@@ -87,7 +87,7 @@ jobs:
             docker --version
             docker compose version
 
-            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+            aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
 
             mkdir -p /home/ec2-user/proyecto-devops-ep2
             cd /home/ec2-user/proyecto-devops-ep2
@@ -172,6 +172,6 @@ jobs:
                 driver: bridge
             EOF
 
-            docker compose pull --ignore-pull-failures
-            docker compose up -d --remove-orphans
-            docker ps
+            sudo docker compose pull --ignore-pull-failures
+            sudo docker compose up -d --remove-orphans
+            sudo docker ps
