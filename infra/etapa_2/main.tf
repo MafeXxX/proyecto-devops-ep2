@@ -203,18 +203,8 @@ resource "aws_security_group" "mysql_sg" {
   }
 }
 
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["al2023-ami-*-x86_64"]
-  }
-}
-
 resource "aws_instance" "frontend" {
-  ami                    = data.aws_ami.amazon_linux.id
+  ami                    = "ami-0c02fb55956c7d316"
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public_frontend.id
   vpc_security_group_ids = [aws_security_group.frontend_sg.id]
@@ -228,12 +218,18 @@ resource "aws_instance" "frontend" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install -y docker
-dnf install -y docker-compose-plugin
-dnf install -y awscli
-systemctl start docker
+dnf install -y docker awscli curl
+
 systemctl enable docker
+systemctl start docker
 usermod -aG docker ec2-user
+
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -L --fail --retry 3 --connect-timeout 20 \
+  https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
 docker --version
 docker compose version
 EOF
@@ -244,7 +240,7 @@ EOF
 }
 
 resource "aws_instance" "backend" {
-  ami                    = data.aws_ami.amazon_linux.id
+  ami                    = "ami-0c02fb55956c7d316"
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.private_backend.id
   vpc_security_group_ids = [aws_security_group.backend_sg.id]
@@ -258,12 +254,18 @@ resource "aws_instance" "backend" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install -y docker
-dnf install -y docker-compose-plugin
-dnf install -y awscli
-systemctl start docker
+dnf install -y docker awscli curl
+
 systemctl enable docker
+systemctl start docker
 usermod -aG docker ec2-user
+
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -L --fail --retry 3 --connect-timeout 20 \
+  https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
 docker --version
 docker compose version
 EOF
@@ -274,7 +276,7 @@ EOF
 }
 
 resource "aws_instance" "mysql" {
-  ami                    = data.aws_ami.amazon_linux.id
+  ami                    = "ami-0c02fb55956c7d316"
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.private_backend.id
   vpc_security_group_ids = [aws_security_group.mysql_sg.id]
@@ -288,15 +290,11 @@ resource "aws_instance" "mysql" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install -y docker
-dnf install -y docker-compose-plugin
-dnf install -y awscli
-systemctl start docker
-systemctl enable docker
-usermod -aG docker ec2-user
+dnf install -y docker awscli curl
 
-docker --version
-docker compose version
+systemctl enable docker
+systemctl start docker
+usermod -aG docker ec2-user
 
 docker volume create mysql_data
 
