@@ -173,5 +173,6 @@ jobs:
             EOF
 
             sudo docker compose pull --ignore-pull-failures
-            sudo docker compose up -d --remove-orphans
+            sudo docker compose down --remove-orphans
+            sudo docker compose up -d --remove-orphans --wait-timeout 120
             sudo docker ps
