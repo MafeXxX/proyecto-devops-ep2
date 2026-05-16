@@ -228,7 +228,7 @@ resource "aws_instance" "frontend" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install docker -y
+dnf install -y docker docker-compose-plugin awscli
 systemctl start docker
 systemctl enable docker
 usermod -aG docker ec2-user
@@ -254,7 +254,7 @@ resource "aws_instance" "backend" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install docker -y
+dnf install -y docker docker-compose-plugin awscli
 systemctl start docker
 systemctl enable docker
 usermod -aG docker ec2-user
@@ -280,7 +280,7 @@ resource "aws_instance" "mysql" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install docker -y
+dnf install -y docker docker-compose-plugin awscli
 systemctl start docker
 systemctl enable docker
 usermod -aG docker ec2-user
