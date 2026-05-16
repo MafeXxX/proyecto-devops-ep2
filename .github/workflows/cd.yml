@@ -157,10 +157,6 @@ jobs:
                 driver: bridge
             EOF
 
-            if ! docker compose version >/dev/null 2>&1; then
-              sudo dnf install -y docker-compose-plugin
-            fi
-
             docker compose version
             docker compose pull --ignore-pull-failures
             docker compose up -d --remove-orphans
