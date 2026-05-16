@@ -66,13 +66,26 @@ jobs:
             export AWS_DEFAULT_REGION="us-east-1"
 
             if ! command -v docker >/dev/null 2>&1; then
-              sudo dnf install -y docker docker-compose-plugin awscli
+              sudo dnf install -y docker
               sudo systemctl enable docker
               sudo systemctl start docker
-              sudo usermod -aG docker ec2-user
+              sudo usermod -aG docker ec2-user || true
+            fi
+
+            if ! docker compose version >/dev/null 2>&1; then
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+
+              sudo curl -L --fail --retry 3 --connect-timeout 20 \
+                https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+                -o /usr/local/lib/docker/cli-plugins/docker-compose
+
+              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
             fi
 
             sudo systemctl start docker
+
+            docker --version
+            docker compose version
 
             aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
 
@@ -159,8 +172,6 @@ jobs:
                 driver: bridge
             EOF
 
-            docker compose version
             docker compose pull --ignore-pull-failures
             docker compose up -d --remove-orphans
             docker ps
-            docker image prune -f
