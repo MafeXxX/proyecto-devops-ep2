@@ -1,0 +1,177 @@
+name: CI/CD proyecto-devops-ep2
+
+on:
+  push:
+    branches:
+      - deploy
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: proyecto-semestral
+
+jobs:
+  build-push-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login en Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build y Push Frontend
+        run: |
+          docker build --platform linux/amd64 \
+            -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-frontend:latest \
+            ./front_despacho
+
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-frontend:latest
+
+      - name: Build y Push Backend Ventas
+        run: |
+          docker build --platform linux/amd64 \
+            -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-ventas:latest \
+            ./back-Ventas_SpringBoot/Springboot-API-REST
+
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-ventas:latest
+
+      - name: Build y Push Backend Despachos
+        run: |
+          docker build --platform linux/amd64 \
+            -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-despachos:latest \
+            ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-despachos:latest
+
+      - name: Deploy automatico en EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+            export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+            export AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}"
+            export AWS_DEFAULT_REGION="us-east-1"
+
+            if ! command -v docker >/dev/null 2>&1; then
+              sudo dnf install -y docker
+              sudo systemctl enable docker
+              sudo systemctl start docker
+              sudo usermod -aG docker ec2-user || true
+            fi
+
+            if ! docker compose version >/dev/null 2>&1; then
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+
+              sudo curl -L --fail --retry 3 --connect-timeout 20 \
+                https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+                -o /usr/local/lib/docker/cli-plugins/docker-compose
+
+              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+            fi
+
+            sudo systemctl start docker
+
+            docker --version
+            docker compose version
+
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+
+            mkdir -p /home/ec2-user/proyecto-devops-ep2
+            cd /home/ec2-user/proyecto-devops-ep2
+
+            cat > docker-compose.yml << 'EOF'
+            services:
+              mysql:
+                image: mysql:8.0
+                container_name: mysql_db
+                restart: unless-stopped
+                environment:
+                  MYSQL_ROOT_PASSWORD: root123
+                  MYSQL_DATABASE: proyecto_db
+                  MYSQL_USER: admin
+                  MYSQL_PASSWORD: admin123
+                ports:
+                  - "3306:3306"
+                volumes:
+                  - mysql_data:/var/lib/mysql
+                networks:
+                  - proyecto-network
+                healthcheck:
+                  test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot123 || exit 1"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 20
+                  start_period: 40s
+
+              backend-ventas:
+                image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-ventas:latest
+                container_name: backend_ventas
+                restart: unless-stopped
+                ports:
+                  - "8080:8080"
+                environment:
+                  DB_ENDPOINT: mysql
+                  DB_PORT: 3306
+                  DB_NAME: proyecto_db
+                  DB_USERNAME: admin
+                  DB_PASSWORD: admin123
+                depends_on:
+                  mysql:
+                    condition: service_healthy
+                networks:
+                  - proyecto-network
+
+              backend-despachos:
+                image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-despachos:latest
+                container_name: backend_despachos
+                restart: unless-stopped
+                ports:
+                  - "8081:8081"
+                environment:
+                  DB_ENDPOINT: mysql
+                  DB_PORT: 3306
+                  DB_NAME: proyecto_db
+                  DB_USERNAME: admin
+                  DB_PASSWORD: admin123
+                depends_on:
+                  mysql:
+                    condition: service_healthy
+                networks:
+                  - proyecto-network
+
+              frontend:
+                image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-frontend:latest
+                container_name: frontend_app
+                restart: unless-stopped
+                ports:
+                  - "80:80"
+                depends_on:
+                  - backend-ventas
+                  - backend-despachos
+                networks:
+                  - proyecto-network
+
+            volumes:
+              mysql_data:
+
+            networks:
+              proyecto-network:
+                driver: bridge
+            EOF
+
+            docker compose pull --ignore-pull-failures
+            docker compose up -d --remove-orphans
+            docker ps
