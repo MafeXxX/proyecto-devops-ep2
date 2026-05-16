@@ -203,8 +203,18 @@ resource "aws_security_group" "mysql_sg" {
   }
 }
 
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+}
+
 resource "aws_instance" "frontend" {
-  ami                    = "ami-0c02fb55956c7d316"
+  ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public_frontend.id
   vpc_security_group_ids = [aws_security_group.frontend_sg.id]
@@ -225,9 +235,11 @@ systemctl start docker
 usermod -aG docker ec2-user
 
 mkdir -p /usr/local/lib/docker/cli-plugins
+
 curl -L --fail --retry 3 --connect-timeout 20 \
   https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
+
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 docker --version
@@ -240,7 +252,7 @@ EOF
 }
 
 resource "aws_instance" "backend" {
-  ami                    = "ami-0c02fb55956c7d316"
+  ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.private_backend.id
   vpc_security_group_ids = [aws_security_group.backend_sg.id]
@@ -261,9 +273,11 @@ systemctl start docker
 usermod -aG docker ec2-user
 
 mkdir -p /usr/local/lib/docker/cli-plugins
+
 curl -L --fail --retry 3 --connect-timeout 20 \
   https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
+
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 docker --version
@@ -276,7 +290,7 @@ EOF
 }
 
 resource "aws_instance" "mysql" {
-  ami                    = "ami-0c02fb55956c7d316"
+  ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.private_backend.id
   vpc_security_group_ids = [aws_security_group.mysql_sg.id]
