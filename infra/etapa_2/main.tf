@@ -135,7 +135,7 @@ resource "aws_security_group" "backend_sg" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "Backend ventas desde frontend"
+    description     = "Ventas desde frontend"
     from_port       = 8080
     to_port         = 8080
     protocol        = "tcp"
@@ -143,7 +143,7 @@ resource "aws_security_group" "backend_sg" {
   }
 
   ingress {
-    description     = "Backend despachos desde frontend"
+    description     = "Despachos desde frontend"
     from_port       = 8081
     to_port         = 8081
     protocol        = "tcp"
@@ -203,8 +203,18 @@ resource "aws_security_group" "mysql_sg" {
   }
 }
 
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+}
+
 resource "aws_instance" "frontend" {
-  ami                    = "ami-0c02fb55956c7d316"
+  ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public_frontend.id
   vpc_security_group_ids = [aws_security_group.frontend_sg.id]
@@ -225,9 +235,11 @@ systemctl start docker
 usermod -aG docker ec2-user
 
 mkdir -p /usr/local/lib/docker/cli-plugins
+
 curl -L --fail --retry 3 --connect-timeout 20 \
   https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
+
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 docker --version
@@ -240,9 +252,10 @@ EOF
 }
 
 resource "aws_instance" "backend" {
-  ami                    = "ami-0c02fb55956c7d316"
+  ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.private_backend.id
+  private_ip             = "10.0.2.250"
   vpc_security_group_ids = [aws_security_group.backend_sg.id]
   key_name               = var.key_pair_name
 
@@ -261,9 +274,11 @@ systemctl start docker
 usermod -aG docker ec2-user
 
 mkdir -p /usr/local/lib/docker/cli-plugins
+
 curl -L --fail --retry 3 --connect-timeout 20 \
   https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
+
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 docker --version
@@ -276,9 +291,10 @@ EOF
 }
 
 resource "aws_instance" "mysql" {
-  ami                    = "ami-0c02fb55956c7d316"
+  ami                    = data.aws_ami.amazon_linux.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.private_backend.id
+  private_ip             = "10.0.2.251"
   vpc_security_group_ids = [aws_security_group.mysql_sg.id]
   key_name               = var.key_pair_name
 
@@ -306,6 +322,11 @@ docker run -d \
   -e MYSQL_PASSWORD=${var.db_password} \
   -p 3306:3306 \
   -v mysql_data:/var/lib/mysql \
+  --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p${var.db_root_password} || exit 1" \
+  --health-interval=5s \
+  --health-timeout=3s \
+  --health-retries=10 \
+  --health-start-period=20s \
   --restart unless-stopped \
   mysql:8.0
 EOF
