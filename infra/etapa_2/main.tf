@@ -228,7 +228,7 @@ resource "aws_instance" "frontend" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install -y docker awscli curl
+dnf install -y docker awscli
 
 systemctl enable docker
 systemctl start docker
@@ -267,7 +267,7 @@ resource "aws_instance" "backend" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install -y docker awscli curl
+dnf install -y docker awscli
 
 systemctl enable docker
 systemctl start docker
@@ -306,7 +306,7 @@ resource "aws_instance" "mysql" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install -y docker awscli curl
+dnf install -y docker awscli
 
 systemctl enable docker
 systemctl start docker
