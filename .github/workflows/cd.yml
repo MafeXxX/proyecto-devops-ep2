@@ -11,6 +11,9 @@ env:
   PROJECT_NAME: proyecto-semestral
   BACKEND_PRIVATE_IP: 10.0.2.250
   MYSQL_PRIVATE_IP: 10.0.2.251
+  DB_NAME: despachosdb
+  DB_USERNAME: admin
+  DB_PASSWORD: admin123
 
 jobs:
   build-push-deploy:
@@ -55,39 +58,70 @@ jobs:
 
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-despachos:latest
 
-      - name: Deploy automatico en EC2 Frontend y Backend privado
+      - name: Deploy automatico en EC2 Frontend y Backend
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 10m
+          command_timeout: 15m
           script: |
             export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
             export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
             export AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}"
             export AWS_DEFAULT_REGION="us-east-1"
 
-            echo "=== Preparando llave SSH temporal para backend privado ==="
+            echo "=== Preparando llave SSH para backend privado ==="
             cat > /tmp/deploy_key.pem << 'KEYEOF'
             ${{ secrets.EC2_SSH_KEY }}
             KEYEOF
             chmod 600 /tmp/deploy_key.pem
 
-            echo "=== Login ECR en Frontend EC2 ==="
+            echo "=== Verificando Docker en Frontend EC2 ==="
+            if ! command -v docker >/dev/null 2>&1; then
+              sudo dnf install -y docker awscli
+              sudo systemctl enable docker
+              sudo systemctl start docker
+              sudo usermod -aG docker ec2-user || true
+            fi
+
+            if ! sudo docker compose version >/dev/null 2>&1; then
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+              sudo curl -L --fail --retry 3 --connect-timeout 20 \
+                https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+                -o /usr/local/lib/docker/cli-plugins/docker-compose
+              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+            fi
+
+            sudo systemctl start docker
+
+            echo "=== Login ECR Frontend ==="
             aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
 
-            echo "=== Deploy Backend en EC2 privada ==="
+            echo "=== Deploy Backend privado ==="
             ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key.pem ec2-user@${{ env.BACKEND_PRIVATE_IP }} "bash -s" << 'BACKEND_SCRIPT'
             export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
             export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
             export AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}"
             export AWS_DEFAULT_REGION="us-east-1"
 
-            echo "=== Verificando Docker en Backend ==="
+            echo "=== Verificando Docker en Backend EC2 ==="
+            if ! command -v docker >/dev/null 2>&1; then
+              sudo dnf install -y docker awscli
+              sudo systemctl enable docker
+              sudo systemctl start docker
+              sudo usermod -aG docker ec2-user || true
+            fi
+
+            if ! sudo docker compose version >/dev/null 2>&1; then
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+              sudo curl -L --fail --retry 3 --connect-timeout 20 \
+                https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+                -o /usr/local/lib/docker/cli-plugins/docker-compose
+              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+            fi
+
             sudo systemctl start docker
-            sudo docker --version
-            sudo docker compose version
 
             echo "=== Login ECR Backend ==="
             aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
@@ -106,7 +140,7 @@ jobs:
                 environment:
                   DB_ENDPOINT: 10.0.2.251
                   DB_PORT: 3306
-                  DB_NAME: proyecto_db
+                  DB_NAME: despachosdb
                   DB_USERNAME: admin
                   DB_PASSWORD: admin123
 
@@ -119,25 +153,26 @@ jobs:
                 environment:
                   DB_ENDPOINT: 10.0.2.251
                   DB_PORT: 3306
-                  DB_NAME: proyecto_db
+                  DB_NAME: despachosdb
                   DB_USERNAME: admin
                   DB_PASSWORD: admin123
             EOF
 
-            echo "=== Pull backend ventas ==="
+            echo "=== Pull Backend Ventas ==="
             timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-ventas:latest
 
-            echo "=== Pull backend despachos ==="
+            echo "=== Pull Backend Despachos ==="
             timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-despachos:latest
 
-            echo "=== Reiniciando backends ==="
+            echo "=== Reiniciando Backends ==="
             timeout 120 sudo docker compose down --remove-orphans || true
             timeout 180 sudo docker compose up -d --remove-orphans
 
+            echo "=== Estado Backend ==="
             sudo docker ps -a
             BACKEND_SCRIPT
 
-            echo "=== Deploy Frontend en EC2 publica ==="
+            echo "=== Deploy Frontend publico ==="
             mkdir -p /home/ec2-user/proyecto-devops-ep2-frontend
             cd /home/ec2-user/proyecto-devops-ep2-frontend
 
@@ -151,13 +186,14 @@ jobs:
                   - "80:80"
             EOF
 
-            echo "=== Pull frontend ==="
+            echo "=== Pull Frontend ==="
             timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-frontend:latest
 
-            echo "=== Reiniciando frontend ==="
+            echo "=== Reiniciando Frontend ==="
             timeout 120 sudo docker compose down --remove-orphans || true
             timeout 180 sudo docker compose up -d --remove-orphans
 
+            echo "=== Estado Frontend ==="
             sudo docker ps -a
 
             echo "=== FIN DEPLOY ==="

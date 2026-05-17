@@ -19,8 +19,12 @@ variable "my_ip_cidr" {
   default     = "0.0.0.0/0"
 }
 
+# =========================
+# MySQL
+# =========================
+
 variable "db_name" {
-  default = "proyecto_db"
+  default = "despachosdb"
 }
 
 variable "db_user" {
@@ -28,9 +32,9 @@ variable "db_user" {
 }
 
 variable "db_password" {
-  default = "Admin12345"
+  default = "admin123"
 }
 
 variable "db_root_password" {
-  default = "Root12345"
+  default = "123456"
 }

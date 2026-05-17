@@ -241,9 +241,6 @@ curl -L --fail --retry 3 --connect-timeout 20 \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-
-docker --version
-docker compose version
 EOF
 
   tags = {
@@ -280,9 +277,6 @@ curl -L --fail --retry 3 --connect-timeout 20 \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-
-docker --version
-docker compose version
 EOF
 
   tags = {
@@ -329,21 +323,17 @@ docker run -d \
   --health-start-period=20s \
   --restart unless-stopped \
   mysql:8.0
+
+sleep 45
+
+docker exec mysql_db mysql -uroot -p${var.db_root_password} -e "
+CREATE USER IF NOT EXISTS '${var.db_user}'@'%' IDENTIFIED BY '${var.db_password}';
+GRANT ALL PRIVILEGES ON ${var.db_name}.* TO '${var.db_user}'@'%';
+FLUSH PRIVILEGES;
+"
 EOF
 
   tags = {
     Name = "${var.project_name}-mysql-ec2"
   }
-}
-
-output "frontend_public_ip" {
-  value = aws_instance.frontend.public_ip
-}
-
-output "backend_private_ip" {
-  value = aws_instance.backend.private_ip
-}
-
-output "mysql_private_ip" {
-  value = aws_instance.mysql.private_ip
 }
