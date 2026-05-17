@@ -9,6 +9,8 @@ on:
 env:
   AWS_REGION: us-east-1
   PROJECT_NAME: proyecto-semestral
+  BACKEND_PRIVATE_IP: 10.0.2.250
+  MYSQL_PRIVATE_IP: 10.0.2.251
 
 jobs:
   build-push-deploy:
@@ -53,7 +55,7 @@ jobs:
 
           docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-despachos:latest
 
-      - name: Deploy automatico en EC2
+      - name: Deploy automatico en EC2 Frontend y Backend privado
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -65,6 +67,7 @@ jobs:
             export AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}"
             export AWS_DEFAULT_REGION="us-east-1"
 
+<<<<<<< Updated upstream
             if ! command -v docker >/dev/null 2>&1; then
               sudo dnf install -y docker
               sudo systemctl enable docker
@@ -81,8 +84,27 @@ jobs:
 
               sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
             fi
+=======
+            echo "=== Preparando llave SSH temporal para backend privado ==="
+            cat > /tmp/deploy_key.pem << 'KEYEOF'
+            ${{ secrets.EC2_SSH_KEY }}
+            KEYEOF
+            chmod 600 /tmp/deploy_key.pem
 
+            echo "=== Login ECR en Frontend EC2 ==="
+            aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+>>>>>>> Stashed changes
+
+            echo "=== Deploy Backend en EC2 privada ==="
+            ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key.pem ec2-user@${{ env.BACKEND_PRIVATE_IP }} "bash -s" << 'BACKEND_SCRIPT'
+            export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+            export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+            export AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}"
+            export AWS_DEFAULT_REGION="us-east-1"
+
+            echo "=== Verificando Docker en Backend ==="
             sudo systemctl start docker
+<<<<<<< Updated upstream
 
             docker --version
             docker compose version
@@ -116,6 +138,19 @@ jobs:
                   retries: 20
                   start_period: 40s
 
+=======
+            sudo docker --version
+            sudo docker compose version
+
+            echo "=== Login ECR Backend ==="
+            aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+
+            mkdir -p /home/ec2-user/proyecto-devops-ep2-backend
+            cd /home/ec2-user/proyecto-devops-ep2-backend
+
+            cat > docker-compose.yml << 'EOF'
+            services:
+>>>>>>> Stashed changes
               backend-ventas:
                 image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-ventas:latest
                 container_name: backend_ventas
@@ -123,16 +158,11 @@ jobs:
                 ports:
                   - "8080:8080"
                 environment:
-                  DB_ENDPOINT: mysql
+                  DB_ENDPOINT: 10.0.2.251
                   DB_PORT: 3306
                   DB_NAME: proyecto_db
                   DB_USERNAME: admin
                   DB_PASSWORD: admin123
-                depends_on:
-                  mysql:
-                    condition: service_healthy
-                networks:
-                  - proyecto-network
 
               backend-despachos:
                 image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-despachos:latest
@@ -141,37 +171,53 @@ jobs:
                 ports:
                   - "8081:8081"
                 environment:
-                  DB_ENDPOINT: mysql
+                  DB_ENDPOINT: 10.0.2.251
                   DB_PORT: 3306
                   DB_NAME: proyecto_db
                   DB_USERNAME: admin
                   DB_PASSWORD: admin123
-                depends_on:
-                  mysql:
-                    condition: service_healthy
-                networks:
-                  - proyecto-network
+            EOF
 
+            echo "=== Pull backend ventas ==="
+            timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-ventas:latest
+
+            echo "=== Pull backend despachos ==="
+            timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-despachos:latest
+
+            echo "=== Reiniciando backends ==="
+            timeout 120 sudo docker compose down --remove-orphans || true
+            timeout 180 sudo docker compose up -d --remove-orphans
+
+            sudo docker ps -a
+            BACKEND_SCRIPT
+
+            echo "=== Deploy Frontend en EC2 publica ==="
+            mkdir -p /home/ec2-user/proyecto-devops-ep2-frontend
+            cd /home/ec2-user/proyecto-devops-ep2-frontend
+
+            cat > docker-compose.yml << 'EOF'
+            services:
               frontend:
                 image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-frontend:latest
                 container_name: frontend_app
                 restart: unless-stopped
                 ports:
                   - "80:80"
-                depends_on:
-                  - backend-ventas
-                  - backend-despachos
-                networks:
-                  - proyecto-network
-
-            volumes:
-              mysql_data:
-
-            networks:
-              proyecto-network:
-                driver: bridge
             EOF
 
+<<<<<<< Updated upstream
             sudo docker compose pull --ignore-pull-failures
             sudo docker compose up -d --remove-orphans
             sudo docker ps
+=======
+            echo "=== Pull frontend ==="
+            timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-frontend:latest
+
+            echo "=== Reiniciando frontend ==="
+            timeout 120 sudo docker compose down --remove-orphans || true
+            timeout 180 sudo docker compose up -d --remove-orphans
+
+            sudo docker ps -a
+
+            echo "=== FIN DEPLOY ==="
+>>>>>>> Stashed changes
