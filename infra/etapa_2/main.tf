@@ -228,10 +228,22 @@ resource "aws_instance" "frontend" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install docker -y
-systemctl start docker
+dnf install -y docker awscli curl
+
 systemctl enable docker
+systemctl start docker
 usermod -aG docker ec2-user
+
+mkdir -p /usr/local/lib/docker/cli-plugins
+
+curl -L --fail --retry 3 --connect-timeout 20 \
+  https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+docker --version
+docker compose version
 EOF
 
   tags = {
@@ -254,10 +266,22 @@ resource "aws_instance" "backend" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install docker -y
-systemctl start docker
+dnf install -y docker awscli curl
+
 systemctl enable docker
+systemctl start docker
 usermod -aG docker ec2-user
+
+mkdir -p /usr/local/lib/docker/cli-plugins
+
+curl -L --fail --retry 3 --connect-timeout 20 \
+  https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+docker --version
+docker compose version
 EOF
 
   tags = {
@@ -280,9 +304,10 @@ resource "aws_instance" "mysql" {
   user_data = <<EOF
 #!/bin/bash
 dnf update -y
-dnf install docker -y
-systemctl start docker
+dnf install -y docker awscli curl
+
 systemctl enable docker
+systemctl start docker
 usermod -aG docker ec2-user
 
 docker volume create mysql_data
