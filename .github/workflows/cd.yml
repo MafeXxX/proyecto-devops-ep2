@@ -177,8 +177,17 @@ jobs:
                 driver: bridge
             EOF
 
-            echo "=== Pull imagenes ==="
-            timeout 180 sudo docker compose pull --ignore-pull-failures
+            echo "=== Pull MySQL ==="
+            timeout 120 sudo docker pull mysql:8.0 || true
+
+            echo "=== Pull Backend Ventas ==="
+            timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-ventas:latest
+
+            echo "=== Pull Backend Despachos ==="
+            timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-despachos:latest
+
+            echo "=== Pull Frontend ==="
+            timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-frontend:latest
 
             echo "=== Bajando contenedores anteriores ==="
             timeout 120 sudo docker compose down --remove-orphans || true
