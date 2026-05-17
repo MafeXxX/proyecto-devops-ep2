@@ -1,0 +1,96 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_db
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: proyecto_db
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin123
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    networks:
+      - proyecto-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot123 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  backend-ventas:
+    build:
+      context: ./back-Ventas_SpringBoot/Springboot-API-REST
+    container_name: backend_ventas
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      DB_ENDPOINT: mysql
+      DB_PORT: 3306
+      DB_NAME: proyecto_db
+      DB_USERNAME: admin
+      DB_PASSWORD: admin123
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    networks:
+      - proyecto-network
+
+  backend-despachos:
+    build:
+      context: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+    container_name: backend_despachos
+    restart: unless-stopped
+
+    ports:
+      - "8081:8081"
+
+    environment:
+      DB_ENDPOINT: mysql
+      DB_PORT: 3306
+      DB_NAME: proyecto_db
+      DB_USERNAME: admin
+      DB_PASSWORD: admin123
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    networks:
+      - proyecto-network
+
+  frontend:
+    build:
+      context: ./front_despacho
+    container_name: frontend_app
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+
+    depends_on:
+      - backend-ventas
+      - backend-despachos
+
+    networks:
+      - proyecto-network
+
+volumes:
+  mysql_data:
+
+networks:
+  proyecto-network:
+    driver: bridge
