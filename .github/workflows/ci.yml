@@ -1,0 +1,31 @@
+name: CI proyecto-devops-ep2
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - deploy
+      - main
+  push:
+    branches:
+      - develop
+
+jobs:
+  ci-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Build Frontend
+        run: |
+          docker build --platform linux/amd64 ./front_despacho
+
+      - name: Build Backend Ventas
+        run: |
+          docker build --platform linux/amd64 ./back-Ventas_SpringBoot/Springboot-API-REST
+
+      - name: Build Backend Despachos
+        run: |
+          docker build --platform linux/amd64 ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO

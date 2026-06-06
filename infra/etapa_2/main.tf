@@ -306,14 +306,18 @@ systemctl enable docker
 systemctl start docker
 usermod -aG docker ec2-user
 
+cat > /home/ec2-user/.env <<ENVEOF
+MYSQL_ROOT_PASSWORD=${var.db_root_password}
+MYSQL_DATABASE=${var.db_name}
+MYSQL_USER=${var.db_user}
+MYSQL_PASSWORD=${var.db_password}
+ENVEOF
+
 docker volume create mysql_data
 
 docker run -d \
   --name mysql_db \
-  -e MYSQL_ROOT_PASSWORD=${var.db_root_password} \
-  -e MYSQL_DATABASE=${var.db_name} \
-  -e MYSQL_USER=${var.db_user} \
-  -e MYSQL_PASSWORD=${var.db_password} \
+  --env-file /home/ec2-user/.env \
   -p 3306:3306 \
   -v mysql_data:/var/lib/mysql \
   --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p${var.db_root_password} || exit 1" \
