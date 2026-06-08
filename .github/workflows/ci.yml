@@ -1,0 +1,73 @@
+name: CI proyecto-devops-ep3
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - deploy
+      - main
+  push:
+    branches:
+      - develop
+
+jobs:
+  ci-build:
+    name: Validar builds Docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Build Frontend
+        run: |
+          docker build --platform linux/amd64 ./front_despacho
+
+      - name: Build Backend Ventas
+        run: |
+          docker build --platform linux/amd64 ./back-Ventas_SpringBoot/Springboot-API-REST
+
+      - name: Build Backend Despachos
+        run: |
+          docker build --platform linux/amd64 ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+
+  terraform-validate:
+    name: Validar Terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        working-directory: infra/terraform
+        run: |
+          terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: infra/terraform
+        run: |
+          terraform init -backend=false
+
+      - name: Terraform validate
+        working-directory: infra/terraform
+        run: |
+          terraform validate
+
+  k8s-validate:
+    name: Validar manifiestos Kubernetes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Validar YAML Kubernetes
+        run: |
+          kubectl apply --dry-run=client --validate=false -f infra/k8s/

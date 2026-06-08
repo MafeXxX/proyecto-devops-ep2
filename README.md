@@ -1,58 +1,81 @@
-# 🚀 Proyecto DevOps – Contenedorización y Despliegue Automatizado en AWS
+# Proyecto Semestral DevOps EP2 🚀
 
-Proyecto desarrollado para la asignatura **ISY1101 - Introducción a Herramientas DevOps** de Duoc UC.  
-El objetivo de esta evaluación es implementar una arquitectura contenerizada utilizando Docker, automatizar el despliegue mediante GitHub Actions y desplegar los servicios en AWS EC2.
+Proyecto desarrollado para la asignatura **ISY1101 - Introducción a Herramientas DevOps**, enfocado en la contenedorización, automatización de despliegue y operación de microservicios utilizando Docker, AWS EC2, Terraform y GitHub Actions.
 
----
-
-# 📌 Descripción del Proyecto
-
-Este proyecto corresponde a una aplicación Full Stack compuesta por:
-
-- 🎨 Frontend
-- ⚙️ Backend
-- 🗄️ Base de Datos
-- ☁️ Infraestructura desplegada en AWS EC2
-- 🔄 Pipeline CI/CD automatizado con GitHub Actions
-
-La solución fue diseñada siguiendo principios DevOps modernos:
-
-- Contenedorización con Docker
-- Automatización CI/CD
-- Persistencia mediante volúmenes Docker
-- Uso de entornos separados
-- Seguridad mediante subredes privadas y Security Groups
-- Preparación para escalabilidad en AWS
+El objetivo principal fue implementar una arquitectura basada en microservicios desplegada en AWS, aplicando principios DevOps reales como CI/CD, infraestructura como código y persistencia de datos.
 
 ---
 
-# 🏗️ Arquitectura General
+# 📌 Arquitectura del Proyecto
 
-```text
-Internet
-   │
-   ▼
-Frontend EC2 (Pública)
-   │
-   ▼
-Backend EC2 (Privada)
-   │
-   ▼
-Base de Datos
+El sistema está compuesto por:
+
+- Frontend
+- Backend Ventas
+- Backend Despachos
+- Base de Datos MySQL
+- AWS EC2
+- Docker
+- GitHub Actions
+- Terraform
+
+---
+
+# 🛠 Tecnologías Utilizadas
+
+## Backend
+- Java 17
+- Spring Boot
+- Maven
+- MySQL
+
+## Frontend
+- HTML
+- CSS
+- JavaScript
+- Nginx
+
+## DevOps
+- Docker
+- Docker Compose
+- GitHub Actions
+- Terraform
+- AWS EC2
+- AWS ECR
+- AWS CLI
+
+---
+
+# 📂 Estructura del Proyecto
+
+```bash
+proyecto-devops/
+│
+├── frontend/
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   └── docker-compose.yml
+│
+├── backend-ventas/
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── src/
+│
+├── backend-despachos/
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── src/
+│
+├── terraform/
+│   ├── etapa_1/
+│   └── etapa_2/
+│
+├── .github/
+│   └── workflows/
+│       └── cd.yml
+│
+└── README.md
 ```
-
-## Componentes principales
-
-| Componente | Tecnología |
-|---|---|
-| Frontend | React / Vite |
-| Backend | Spring Boot |
-| Base de Datos | MySQL |
-| Contenedores | Docker |
-| Orquestación | Docker Compose |
-| CI/CD | GitHub Actions |
-| Cloud | AWS EC2 |
-| Infraestructura | Terraform |
 
 ---
 
@@ -60,114 +83,84 @@ Base de Datos
 
 Cada servicio fue dockerizado utilizando buenas prácticas DevOps:
 
-## Frontend
+✅ Multi-stage build  
+✅ Optimización de capas  
+✅ Separación de servicios  
+✅ Variables de entorno  
+✅ Persistencia mediante volúmenes  
+✅ Automatización del despliegue  
 
-- Multi-stage build
-- Nginx para servir archivos estáticos
-- Optimización de tamaño de imagen
-- Usuario no root
+---
 
-## Backend
+# ⚙ Docker Compose
 
-- Multi-stage build
-- OpenJDK 17
-- Variables de entorno
-- Usuario no root
+El proyecto utiliza `docker-compose.yml` para levantar el stack completo de servicios.
+
+## Servicios principales
+
+- frontend
+- backend-ventas
+- backend-despachos
+- mysql
+
+## Características
+
+- Redes internas privadas
 - Persistencia mediante volúmenes
-
----
-
-# 📂 Estructura del Proyecto
-
-```text
-project/
-│
-├── frontend/
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   └── ...
-│
-├── backend/
-│   ├── Dockerfile
-│   └── ...
-│
-├── docker-compose.yml
-│
-├── terraform/
-│   ├── main.tf
-│   ├── variables.tf
-│   ├── outputs.tf
-│   └── ...
-│
-├── .github/
-│   └── workflows/
-│       └── deploy.yml
-│
-└── README.md
-```
-
----
-
-# ⚙️ Docker Compose
-
-El proyecto utiliza `docker-compose.yml` para levantar los servicios.
-
-## Servicios incluidos
-
-- Frontend
-- Backend
-- Base de datos
-
-## Funcionalidades implementadas
-
-- Redes internas Docker
-- Persistencia con volúmenes
 - Variables de entorno
-- Dependencias entre servicios
-- Puertos expuestos correctamente
+- Exposición controlada de puertos
 
 ---
 
 # 💾 Persistencia de Datos
 
-Se implementó persistencia utilizando volúmenes Docker para asegurar continuidad operativa.
+Se implementó persistencia utilizando Docker Volumes para evitar pérdida de información tras reinicios de contenedores.
 
 ## Volúmenes utilizados
 
-| Volumen | Uso |
-|---|---|
-| mysql_data | Persistencia de la base de datos |
-| backend_logs | Logs del backend |
+```yaml
+volumes:
+  mysql_data:
+```
 
 ## Beneficios
 
-- Los datos no se pierden al reiniciar contenedores
-- Mayor estabilidad
-- Facilita mantenimiento y recuperación
+- Continuidad operativa
+- Persistencia de la base de datos
+- Separación entre contenedor y almacenamiento
 
 ---
 
-# ☁️ Infraestructura AWS
+# ☁ Infraestructura AWS
 
-La solución fue desplegada utilizando AWS EC2.
+La infraestructura fue creada utilizando Terraform.
 
-## Arquitectura AWS
+## Componentes desplegados
 
-### Instancia Pública
-- Frontend
-- Acceso desde Internet
-
-### Instancia Privada
-- Backend
-- Base de datos
-- Acceso restringido
-
-## Seguridad aplicada
-
-- Security Groups
+- VPC personalizada
+- Subred pública
 - Subred privada
-- Restricción de acceso al Backend
-- Solo el Frontend es accesible públicamente
+- Security Groups
+- EC2 Frontend
+- EC2 Backend
+- NAT Gateway
+- Elastic IP
+- Repositorios ECR
+
+---
+
+# 🔒 Seguridad Implementada
+
+## Frontend
+- Accesible desde Internet mediante IP pública.
+
+## Backend
+- Ejecutándose en subred privada.
+- Acceso restringido mediante Security Groups.
+
+## Docker
+- Uso de contenedores aislados.
+- Variables sensibles mediante GitHub Secrets.
 
 ---
 
@@ -175,60 +168,55 @@ La solución fue desplegada utilizando AWS EC2.
 
 Se implementó automatización completa utilizando GitHub Actions.
 
-## Flujo del pipeline
+## Flujo del Pipeline
 
 ```text
 Push rama deploy
         ↓
 Build Docker Image
         ↓
-Push Docker Hub / ECR
+Push a ECR / Docker Hub
         ↓
-Deploy automático EC2
+Deploy automático en EC2
         ↓
-Actualización del servicio
+Actualización del contenedor
 ```
 
-## Automatizaciones implementadas
+## Características
 
-- Build automático
-- Publicación de imágenes
-- Deploy automático
-- Reinicio de contenedores
+- Trigger automático mediante rama `deploy`
+- Build automatizado
+- Publicación automática
+- Deploy remoto mediante SSH
 - Uso de GitHub Secrets
 
 ---
 
-# 🔐 Variables y Secrets
+# 🔑 GitHub Secrets Utilizados
 
-Las credenciales sensibles se gestionan mediante GitHub Secrets:
-
-| Secret | Descripción |
-|---|---|
-| AWS_ACCESS_KEY_ID | Credencial AWS |
-| AWS_SECRET_ACCESS_KEY | Credencial AWS |
-| EC2_HOST | IP pública EC2 |
-| EC2_USER | Usuario SSH |
-| DOCKER_USERNAME | Usuario Docker Hub |
-| DOCKER_PASSWORD | Password Docker Hub |
+```text
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+AWS_REGION
+EC2_HOST
+EC2_USER
+SSH_PRIVATE_KEY
+ECR_REPOSITORY
+```
 
 ---
 
-# ▶️ Ejecución Local
+# 🚀 Ejecución Local
 
 ## 1. Clonar repositorio
 
 ```bash
-git clone https://github.com/USUARIO/REPOSITORIO.git
+git clone https://github.com/MafeXxX/proyecto-devops-ep2
 ```
 
-## 2. Entrar al proyecto
+---
 
-```bash
-cd proyecto
-```
-
-## 3. Levantar servicios
+## 2. Levantar servicios
 
 ```bash
 docker compose up -d --build
@@ -236,77 +224,117 @@ docker compose up -d --build
 
 ---
 
-# 🌐 Acceso a Servicios
+## 3. Verificar contenedores
 
-| Servicio | URL |
-|---|---|
-| Frontend | http://localhost |
-| Backend | http://localhost:8080 |
-
----
-
-# 🧪 Tecnologías Utilizadas
-
-- Docker
-- Docker Compose
-- GitHub Actions
-- AWS EC2
-- Terraform
-- React
-- Spring Boot
-- MySQL
-- Nginx
-- Git
+```bash
+docker ps
+```
 
 ---
 
-# 📖 Principios DevOps Aplicados
+# ☁ Despliegue en AWS
 
-Durante el desarrollo se aplicaron prácticas DevOps reales:
+## Terraform
 
-- ✅ Contenedorización
-- ✅ Integración continua
-- ✅ Despliegue continuo
-- ✅ Infraestructura como código
-- ✅ Automatización
-- ✅ Persistencia de datos
-- ✅ Control de versiones
-- ✅ Seguridad y segmentación de red
+### Etapa 1
 
-Estas prácticas permiten:
+```bash
+cd terraform/etapa_1
 
-- Mayor escalabilidad
-- Mejor mantenibilidad
-- Despliegues rápidos
-- Menor tiempo de recuperación
-- Mejor trazabilidad
+terraform init
+terraform apply
+```
 
----
+### Etapa 2
 
-# 👨‍💻 Integrantes
+```bash
+cd terraform/etapa_2
 
-- Nombre Integrante 1
-- Nombre Integrante 2
+terraform init
+terraform apply
+```
 
 ---
 
-# 📚 Contexto Académico
+# 📡 Acceso al Sistema
 
-Proyecto realizado para la Evaluación Parcial N°2 de la asignatura:
+## Frontend
+
+```text
+http://IP_PUBLICA_FRONTEND
+```
+
+## APIs Backend
+
+```text
+/api/ventas
+/api/despachos
+```
+
+---
+
+# 🧪 Validaciones Realizadas
+
+✅ Comunicación Frontend → Backend  
+✅ Persistencia de datos  
+✅ Build automático  
+✅ Deploy automático  
+✅ Acceso restringido al backend  
+✅ Funcionamiento en EC2  
+✅ Docker Compose funcional  
+
+---
+
+# 📸 Evidencias Consideradas
+
+- GitHub Actions ejecutándose
+- Docker containers activos
+- AWS Console
+- Terraform Apply
+- Frontend funcionando en navegador
+- Comunicación entre microservicios
+
+---
+
+# 📚 Principios DevOps Aplicados
+
+- Infraestructura como código
+- Contenedorización
+- Automatización CI/CD
+- Control de versiones
+- Persistencia de datos
+- Escalabilidad
+- Trazabilidad
+- Mantenibilidad
+
+---
+
+# 👨‍💻 Autores
+
+Proyecto desarrollado para:
 
 **ISY1101 - Introducción a Herramientas DevOps**  
-Duoc UC – 2025
+Duoc UC - 2025
+
+---
+
+# 📄 Referencias
+
+Documentación oficial utilizada:
+
+- Docker
+- GitHub Actions
+- AWS EC2
+- AWS ECR
+- Terraform
+- Spring Boot
 
 ---
 
 # ✅ Estado del Proyecto
 
-✔️ Frontend dockerizado  
-✔️ Backend dockerizado  
-✔️ Persistencia implementada  
-✔️ CI/CD funcional  
-✔️ Deploy en AWS EC2  
-✔️ Comunicación Front → Back  
-✔️ Infraestructura automatizada con Terraform  
-
----
+🟢 Proyecto funcional  
+🟢 Despliegue automatizado  
+🟢 Persistencia operativa  
+🟢 Comunicación Front ↔ Back funcional  
+🟢 Infraestructura desplegada en AWS
