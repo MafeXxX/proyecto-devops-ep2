@@ -3,12 +3,12 @@ name: CI proyecto-devops-ep3
 on:
   pull_request:
     branches:
-      - develop
+      - feature/develop
       - deploy
       - main
   push:
     branches:
-      - develop
+      - feature/develop
 
 jobs:
   ci-build:
