@@ -37,7 +37,6 @@ jobs:
 
       - name: Definir URLs de imagenes ECR
         run: |
-          echo "ECR_REGISTRY=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com" >> $GITHUB_ENV
           echo "FRONTEND_IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-frontend" >> $GITHUB_ENV
           echo "BACK_VENTAS_IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-ventas" >> $GITHUB_ENV
           echo "BACK_DESPACHOS_IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-despachos" >> $GITHUB_ENV
@@ -80,9 +79,22 @@ jobs:
 
           kubectl get nodes
 
-      - name: Aplicar manifiestos base de Kubernetes
+      - name: Aplicar Namespace
         run: |
           kubectl apply -f infra/k8s/namespace.yml
+
+      - name: Aplicar Metrics Server
+        run: |
+          kubectl apply -f infra/k8s/metrics-server.yml
+
+      - name: Esperar Metrics Server
+        run: |
+          kubectl rollout status deployment/metrics-server \
+            -n kube-system \
+            --timeout=3m
+
+      - name: Aplicar MySQL Secret y MySQL
+        run: |
           kubectl apply -f infra/k8s/mysql-secret.yml
           kubectl apply -f infra/k8s/mysql.yml
 
@@ -115,9 +127,17 @@ jobs:
 
       - name: Verificar despliegue
         run: |
-          kubectl rollout status deployment/frontend -n ${{ env.NAMESPACE }} --timeout=5m
-          kubectl rollout status deployment/backend-ventas -n ${{ env.NAMESPACE }} --timeout=5m
-          kubectl rollout status deployment/backend-despachos -n ${{ env.NAMESPACE }} --timeout=5m
+          kubectl rollout status deployment/frontend \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=5m
+
+          kubectl rollout status deployment/backend-ventas \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=5m
+
+          kubectl rollout status deployment/backend-despachos \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=5m
 
       - name: Mostrar estado final del cluster
         run: |
@@ -132,6 +152,9 @@ jobs:
 
           echo "=== HPA ==="
           kubectl get hpa -n ${{ env.NAMESPACE }}
+
+          echo "=== Metrics Server ==="
+          kubectl get deployment metrics-server -n kube-system
 
           echo "=== URL publica Frontend ==="
           kubectl get svc frontend-service -n ${{ env.NAMESPACE }}
