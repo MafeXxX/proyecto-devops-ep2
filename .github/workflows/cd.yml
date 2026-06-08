@@ -1,4 +1,4 @@
-name: CI/CD proyecto-devops-ep2
+name: CI/CD proyecto-devops-ep3
 
 on:
   push:
@@ -9,7 +9,9 @@ on:
 env:
   AWS_REGION: us-east-1
   PROJECT_NAME: proyecto-semestral
-  BACKEND_PRIVATE_IP: 10.0.2.250
+  EKS_CLUSTER_NAME: proyecto-semestral-cluster
+  NAMESPACE: proyecto-semestral
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   build-push-deploy:
@@ -30,173 +32,106 @@ jobs:
       - name: Login en Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Configurar kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Definir URLs de imagenes ECR
+        run: |
+          echo "ECR_REGISTRY=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com" >> $GITHUB_ENV
+          echo "FRONTEND_IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-frontend" >> $GITHUB_ENV
+          echo "BACK_VENTAS_IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-ventas" >> $GITHUB_ENV
+          echo "BACK_DESPACHOS_IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-despachos" >> $GITHUB_ENV
+
       - name: Build y Push Frontend
         run: |
           docker build --platform linux/amd64 \
-            -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-frontend:latest \
+            -t $FRONTEND_IMAGE:${{ env.IMAGE_TAG }} \
+            -t $FRONTEND_IMAGE:latest \
             ./front_despacho
 
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-frontend:latest
+          docker push $FRONTEND_IMAGE:${{ env.IMAGE_TAG }}
+          docker push $FRONTEND_IMAGE:latest
 
       - name: Build y Push Backend Ventas
         run: |
           docker build --platform linux/amd64 \
-            -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-ventas:latest \
+            -t $BACK_VENTAS_IMAGE:${{ env.IMAGE_TAG }} \
+            -t $BACK_VENTAS_IMAGE:latest \
             ./back-Ventas_SpringBoot/Springboot-API-REST
 
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-ventas:latest
+          docker push $BACK_VENTAS_IMAGE:${{ env.IMAGE_TAG }}
+          docker push $BACK_VENTAS_IMAGE:latest
 
       - name: Build y Push Backend Despachos
         run: |
           docker build --platform linux/amd64 \
-            -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-despachos:latest \
+            -t $BACK_DESPACHOS_IMAGE:${{ env.IMAGE_TAG }} \
+            -t $BACK_DESPACHOS_IMAGE:latest \
             ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
 
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.PROJECT_NAME }}-back-despachos:latest
+          docker push $BACK_DESPACHOS_IMAGE:${{ env.IMAGE_TAG }}
+          docker push $BACK_DESPACHOS_IMAGE:latest
 
-      - name: Deploy automatico en EC2 Frontend y Backend
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 15m
-          script: |
-            export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
-            export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-            export AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}"
-            export AWS_DEFAULT_REGION="us-east-1"
+      - name: Conectar kubectl con EKS
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ env.EKS_CLUSTER_NAME }}
 
-            echo "=== Preparando llave SSH para backend privado ==="
-            cat > /tmp/deploy_key.pem << 'KEYEOF'
-            ${{ secrets.EC2_SSH_KEY }}
-            KEYEOF
-            chmod 600 /tmp/deploy_key.pem
+          kubectl get nodes
 
-            echo "=== Verificando Docker en Frontend EC2 ==="
-            if ! command -v docker >/dev/null 2>&1; then
-              sudo dnf install -y docker awscli
-              sudo systemctl enable docker
-              sudo systemctl start docker
-              sudo usermod -aG docker ec2-user || true
-            fi
+      - name: Aplicar manifiestos base de Kubernetes
+        run: |
+          kubectl apply -f infra/k8s/namespace.yml
+          kubectl apply -f infra/k8s/mysql-secret.yml
+          kubectl apply -f infra/k8s/mysql.yml
 
-            if ! sudo docker compose version >/dev/null 2>&1; then
-              sudo mkdir -p /usr/local/lib/docker/cli-plugins
-              sudo curl -L --fail --retry 3 --connect-timeout 20 \
-                https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
-                -o /usr/local/lib/docker/cli-plugins/docker-compose
-              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-            fi
+      - name: Esperar MySQL
+        run: |
+          kubectl rollout status deployment/mysql \
+            -n ${{ env.NAMESPACE }} \
+            --timeout=5m
 
-            sudo systemctl start docker
+      - name: Aplicar manifiestos de aplicacion
+        run: |
+          kubectl apply -f infra/k8s/backend-ventas.yml
+          kubectl apply -f infra/k8s/backend-despachos.yml
+          kubectl apply -f infra/k8s/frontend.yml
+          kubectl apply -f infra/k8s/hpa.yml
 
-            echo "=== Login ECR Frontend ==="
-            aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+      - name: Actualizar imagenes en EKS
+        run: |
+          kubectl set image deployment/frontend \
+            frontend=$FRONTEND_IMAGE:${{ env.IMAGE_TAG }} \
+            -n ${{ env.NAMESPACE }}
 
-            echo "=== Copiando .env hacia Backend privado ==="
-            if [ ! -f /home/ec2-user/.env ]; then
-              echo "ERROR: No existe /home/ec2-user/.env en la EC2 Frontend."
-              echo "Debes copiarlo antes del deploy con:"
-              echo "scp -i keys_proyectos_semestral.pem .env ec2-user@IP_PUBLICA_FRONTEND:/home/ec2-user/.env"
-              exit 1
-            fi
+          kubectl set image deployment/backend-ventas \
+            backend-ventas=$BACK_VENTAS_IMAGE:${{ env.IMAGE_TAG }} \
+            -n ${{ env.NAMESPACE }}
 
-            scp -o StrictHostKeyChecking=no -i /tmp/deploy_key.pem /home/ec2-user/.env ec2-user@${{ env.BACKEND_PRIVATE_IP }}:/home/ec2-user/.env
+          kubectl set image deployment/backend-despachos \
+            backend-despachos=$BACK_DESPACHOS_IMAGE:${{ env.IMAGE_TAG }} \
+            -n ${{ env.NAMESPACE }}
 
-            echo "=== Deploy Backend privado ==="
-            ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key.pem ec2-user@${{ env.BACKEND_PRIVATE_IP }} "bash -s" << 'BACKEND_SCRIPT'
-            export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
-            export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-            export AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}"
-            export AWS_DEFAULT_REGION="us-east-1"
+      - name: Verificar despliegue
+        run: |
+          kubectl rollout status deployment/frontend -n ${{ env.NAMESPACE }} --timeout=5m
+          kubectl rollout status deployment/backend-ventas -n ${{ env.NAMESPACE }} --timeout=5m
+          kubectl rollout status deployment/backend-despachos -n ${{ env.NAMESPACE }} --timeout=5m
 
-            echo "=== Verificando Docker en Backend EC2 ==="
-            if ! command -v docker >/dev/null 2>&1; then
-              sudo dnf install -y docker awscli
-              sudo systemctl enable docker
-              sudo systemctl start docker
-              sudo usermod -aG docker ec2-user || true
-            fi
+      - name: Mostrar estado final del cluster
+        run: |
+          echo "=== Pods ==="
+          kubectl get pods -n ${{ env.NAMESPACE }}
 
-            if ! sudo docker compose version >/dev/null 2>&1; then
-              sudo mkdir -p /usr/local/lib/docker/cli-plugins
-              sudo curl -L --fail --retry 3 --connect-timeout 20 \
-                https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
-                -o /usr/local/lib/docker/cli-plugins/docker-compose
-              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-            fi
+          echo "=== Services ==="
+          kubectl get svc -n ${{ env.NAMESPACE }}
 
-            sudo systemctl start docker
+          echo "=== Deployments ==="
+          kubectl get deployments -n ${{ env.NAMESPACE }}
 
-            if [ ! -f /home/ec2-user/.env ]; then
-              echo "ERROR: No existe /home/ec2-user/.env en Backend."
-              exit 1
-            fi
+          echo "=== HPA ==="
+          kubectl get hpa -n ${{ env.NAMESPACE }}
 
-            echo "=== Login ECR Backend ==="
-            aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-
-            mkdir -p /home/ec2-user/proyecto-devops-ep2-backend
-            cd /home/ec2-user/proyecto-devops-ep2-backend
-
-            cat > docker-compose.yml << 'EOF'
-            services:
-              backend-ventas:
-                image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-ventas:latest
-                container_name: backend_ventas
-                restart: unless-stopped
-                ports:
-                  - "8080:8080"
-                env_file:
-                  - /home/ec2-user/.env
-
-              backend-despachos:
-                image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-despachos:latest
-                container_name: backend_despachos
-                restart: unless-stopped
-                ports:
-                  - "8081:8081"
-                env_file:
-                  - /home/ec2-user/.env
-            EOF
-
-            echo "=== Pull Backend Ventas ==="
-            timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-ventas:latest
-
-            echo "=== Pull Backend Despachos ==="
-            timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-back-despachos:latest
-
-            echo "=== Reiniciando Backends ==="
-            timeout 120 sudo docker compose down --remove-orphans || true
-            timeout 180 sudo docker compose up -d --remove-orphans
-
-            echo "=== Estado Backend ==="
-            sudo docker ps -a
-            BACKEND_SCRIPT
-
-            echo "=== Deploy Frontend publico ==="
-            mkdir -p /home/ec2-user/proyecto-devops-ep2-frontend
-            cd /home/ec2-user/proyecto-devops-ep2-frontend
-
-            cat > docker-compose.yml << 'EOF'
-            services:
-              frontend:
-                image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-frontend:latest
-                container_name: frontend_app
-                restart: unless-stopped
-                ports:
-                  - "80:80"
-            EOF
-
-            echo "=== Pull Frontend ==="
-            timeout 120 sudo docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/proyecto-semestral-frontend:latest
-
-            echo "=== Reiniciando Frontend ==="
-            timeout 120 sudo docker compose down --remove-orphans || true
-            timeout 180 sudo docker compose up -d --remove-orphans
-
-            echo "=== Estado Frontend ==="
-            sudo docker ps -a
-
-            echo "=== FIN DEPLOY ==="
+          echo "=== URL publica Frontend ==="
+          kubectl get svc frontend-service -n ${{ env.NAMESPACE }}
