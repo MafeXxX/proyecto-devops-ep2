@@ -42,13 +42,13 @@ spec:
             - name: DB_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: mysql-secret
+                  name: secrets
                   key: DB_USERNAME
 
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: mysql-secret
+                  name: secrets
                   key: DB_PASSWORD
 
           resources:
