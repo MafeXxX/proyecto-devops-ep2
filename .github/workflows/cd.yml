@@ -1,4 +1,4 @@
-name: CI/CD proyecto-devops-ep3
+name: CD proyecto-devops-ep3
 
 on:
   push:
@@ -93,7 +93,7 @@ jobs:
             -n kube-system \
             --timeout=3m
 
-      - name: Aplicar MySQL Secret y MySQL
+      - name: Aplicar Secrets y MySQL
         run: |
           kubectl apply -f infra/k8s/secrets.yml
           kubectl apply -f infra/k8s/mysql.yml
@@ -157,4 +157,12 @@ jobs:
           kubectl get deployment metrics-server -n kube-system
 
           echo "=== URL publica Frontend ==="
-          kubectl get svc frontend-service -n ${{ env.NAMESPACE }}
+          FRONTEND_URL=$(kubectl get svc frontend-service \
+            -n ${{ env.NAMESPACE }} \
+            -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
+
+          echo ""
+          echo "================================="
+          echo "Frontend disponible en:"
+          echo "http://$FRONTEND_URL"
+          echo "================================="
