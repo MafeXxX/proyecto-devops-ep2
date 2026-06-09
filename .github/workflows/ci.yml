@@ -1,6 +1,7 @@
 name: CI proyecto-devops-ep3
 
-on:
+"on":
+  workflow_dispatch:
   pull_request:
     branches:
       - feature/develop
