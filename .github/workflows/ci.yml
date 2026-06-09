@@ -3,12 +3,12 @@ name: CI proyecto-devops-ep3
 on:
   pull_request:
     branches:
-      - develop
+      - feature/develop
       - deploy
       - main
   push:
     branches:
-      - develop
+      - feature/develop
 
 jobs:
   ci-build:
@@ -65,9 +65,11 @@ jobs:
       - name: Descargar codigo
         uses: actions/checkout@v4
 
-      - name: Configurar kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Validar YAML Kubernetes
+      - name: Instalar yamllint
         run: |
-          kubectl apply --dry-run=client --validate=false -f infra/k8s/
+          python -m pip install --upgrade pip
+          pip install yamllint
+
+      - name: Validar sintaxis YAML Kubernetes
+        run: |
+          yamllint -d "{extends: default, rules: {line-length: disable, document-start: disable, truthy: disable}}" infra/k8s/
