@@ -520,25 +520,6 @@ kubectl top pods -n proyecto-semestral
 
 ---
 
-# 📸 Evidencias Recomendadas
-
-Para la presentación y defensa técnica se recomienda guardar capturas de:
-
-* `terraform apply` exitoso.
-* `terraform output`.
-* `kubectl get nodes`.
-* GitHub Actions CI exitoso.
-* GitHub Actions CD exitoso.
-* Repositorios ECR con imágenes publicadas.
-* `kubectl get all -n proyecto-semestral`.
-* `kubectl get svc -n proyecto-semestral`.
-* Frontend funcionando desde navegador.
-* Logs de los backends.
-* `kubectl get hpa -n proyecto-semestral`.
-* `kubectl top pods -n proyecto-semestral`.
-
----
-
 # 📚 Principios DevOps Aplicados
 
 * Infraestructura como código con Terraform.
