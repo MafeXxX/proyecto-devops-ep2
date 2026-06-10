@@ -1,0 +1,76 @@
+name: CI proyecto-devops-ep3
+
+on:
+  pull_request:
+    branches:
+      - feature/develop
+      - deploy
+      - main
+  push:
+    branches:
+      - feature/develop
+  workflow_dispatch:
+
+jobs:
+  ci-build:
+    name: Validar builds Docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Build Frontend
+        run: |
+          docker build --platform linux/amd64 ./front_despacho
+
+      - name: Build Backend Ventas
+        run: |
+          docker build --platform linux/amd64 ./back-Ventas_SpringBoot/Springboot-API-REST
+
+      - name: Build Backend Despachos
+        run: |
+          docker build --platform linux/amd64 ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+
+  terraform-validate:
+    name: Validar Terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        working-directory: infra/terraform
+        run: |
+          terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: infra/terraform
+        run: |
+          terraform init -backend=false
+
+      - name: Terraform validate
+        working-directory: infra/terraform
+        run: |
+          terraform validate
+
+  k8s-validate:
+    name: Validar manifiestos Kubernetes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar yamllint
+        run: |
+          python -m pip install --upgrade pip
+          pip install yamllint
+
+      - name: Validar sintaxis YAML Kubernetes
+        run: |
+          yamllint -d "{extends: default, rules: {line-length: disable, document-start: disable, truthy: disable}}" infra/k8s/
