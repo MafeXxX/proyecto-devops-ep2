@@ -82,6 +82,37 @@ resource "aws_route_table_association" "public_2" {
 }
 
 # =========================
+# SECURITY GROUP EKS
+# =========================
+
+resource "aws_security_group" "eks_cluster" {
+  name        = "${var.project_name}-eks-cluster-sg"
+  description = "Security Group personalizado para el cluster EKS"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    description = "Acceso HTTPS al API Server desde la VPC"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "Salida general del cluster"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name                                                = "${var.project_name}-eks-cluster-sg"
+    "kubernetes.io/cluster/${var.project_name}-cluster" = "owned"
+  }
+}
+
+# =========================
 # ECR REPOSITORIES
 # =========================
 
@@ -137,6 +168,13 @@ resource "aws_eks_cluster" "main" {
       aws_subnet.public_1.id,
       aws_subnet.public_2.id
     ]
+
+    security_group_ids = [
+      aws_security_group.eks_cluster.id
+    ]
+
+    endpoint_public_access  = true
+    endpoint_private_access = true
   }
 
   tags = {
