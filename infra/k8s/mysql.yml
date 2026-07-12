@@ -1,3 +1,16 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+parameters:
+  type: gp3
+  encrypted: "true"
+
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,6 +23,20 @@ data:
   MYSQL_DATABASE: "despachosdb"
 
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: proyecto-semestral
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 5Gi
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,18 +44,25 @@ metadata:
   namespace: proyecto-semestral
 spec:
   replicas: 1
+
+  strategy:
+    type: Recreate
+
   selector:
     matchLabels:
       app: mysql
+
   template:
     metadata:
       labels:
         app: mysql
+
     spec:
       containers:
         - name: mysql
           image: mysql:8.0
           imagePullPolicy: IfNotPresent
+
           ports:
             - containerPort: 3306
 
@@ -57,6 +91,10 @@ spec:
                   name: secrets
                   key: MYSQL_PASSWORD
 
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: /var/lib/mysql
+
           resources:
             requests:
               cpu: "250m"
@@ -76,6 +114,11 @@ spec:
               port: 3306
             initialDelaySeconds: 60
             periodSeconds: 20
+
+      volumes:
+        - name: mysql-storage
+          persistentVolumeClaim:
+            claimName: mysql-pvc
 
 ---
 apiVersion: v1
