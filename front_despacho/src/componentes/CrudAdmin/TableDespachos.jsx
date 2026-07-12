@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { Modal } from "./Modal";
 import { FormCierreDespacho } from "./FormCierreDespacho";
@@ -6,7 +6,7 @@ import { FormCierreDespacho } from "./FormCierreDespacho";
 export const TableDespachos = () => {
   const [despachos, setDespachos] = useState([]);
 
-  const despacho = async () => {
+  const despacho = useCallback(async () => {
     await axios
       .get("/api/v1/despachos", {
         headers:{
@@ -18,11 +18,12 @@ export const TableDespachos = () => {
         console.log(response.data);
         setDespachos(response.data);
       });
-  };
+  }, []);
+
   // Llamada a la función para obtener los datos cuando el componente se monta
   useEffect(() => {
     despacho();
-  }, []);
+  }, [despacho]);
 
   const [openModal, setOpenModal] = useState(false);
   const [despachoSeleccionado, setDespachoSeleccionado] = useState(null);
@@ -51,7 +52,7 @@ export const TableDespachos = () => {
               </thead>
               <tbody>
                 {despachos
-               
+
                 .map((despacho) => (
                   <tr key={despacho.idDespacho}>
                     <td className="pr-10 py-10 items-center">{despacho.idDespacho}</td>
@@ -101,7 +102,8 @@ export const TableDespachos = () => {
             despacho={despachoSeleccionado}
             onClose={() => {
               //onclose es un prop que pasa funciones al modal con el form abierto, por ende al cerrarse, se ejecutan esas 2 funciones
-              setOpenModal(false), despacho();
+              setOpenModal(false);
+              despacho();
             }}
           />
         )}

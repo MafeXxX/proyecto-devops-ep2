@@ -1,4 +1,3 @@
-import React from "react";
 import logo1 from "../../assets/images/logo2.png";
 
 function Footer() {
@@ -13,6 +12,7 @@ function Footer() {
               </div>
             </a>
           </div>
+
           <div className="grid grid-cols-2 gap-8 sm:gap-6 sm:grid-cols-3">
             <div>
               <h2 className="mb-6 text-sm font-semibold text-white uppercase dark:text-white">
@@ -31,13 +31,14 @@ function Footer() {
                 </li>
               </ul>
             </div>
+
             <div>
-              <h2 className="mb-6 text-sm font-semibold  uppercase dark:text-white">
+              <h2 className="mb-6 text-sm font-semibold uppercase dark:text-white">
                 Siguenos
               </h2>
-              <ul className=" text-white">
+              <ul className="text-white">
                 <li className="mb-4">
-                  <a href="#" className="hover:underline ">
+                  <a href="#" className="hover:underline">
                     Instagram
                   </a>
                 </li>
@@ -48,6 +49,7 @@ function Footer() {
                 </li>
               </ul>
             </div>
+
             <div>
               <h2 className="mb-6 text-sm font-semibold text-white uppercase dark:text-white">
                 Legal
@@ -67,7 +69,9 @@ function Footer() {
             </div>
           </div>
         </div>
+
         <hr className="my-6 border-gray-200 sm:mx-auto dark:border-gray-700 lg:my-8" />
+
         <div className="sm:flex sm:items-center sm:justify-between">
           <span className="text-sm text-gray-800 dark:text-gray-800 sm:text-center">
             © 2024{" "}
