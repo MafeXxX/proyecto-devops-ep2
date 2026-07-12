@@ -1,4 +1,4 @@
-import React from "react";
+import PropTypes from "prop-types";
 
 export const Modal = ({ open, onClose, children }) => {
   return (
@@ -9,7 +9,7 @@ export const Modal = ({ open, onClose, children }) => {
     >
       <div
         onClick={(e) => {
-          e.stopPropagation;
+          e.stopPropagation();
         }}
         className={`flex flex-col items-end bg-white  transition-all rounded-lg ${
           open ? "scale-90 opacity-100" : "scale-100 opacity-0"
@@ -26,4 +26,10 @@ export const Modal = ({ open, onClose, children }) => {
       </div>
     </div>
   );
+};
+
+Modal.propTypes = {
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  children: PropTypes.node.isRequired,
 };
