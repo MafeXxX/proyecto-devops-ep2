@@ -91,4 +91,3 @@ spec:
     - name: mysql
       port: 3306
       targetPort: 3306
-      
